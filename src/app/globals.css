@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/*
+ * The Hub's design tokens, copied from boost33-hub/src/app/globals.css (Paper
+ * file BoostLedger, page 001 Foundations). Same names, same values, plus
+ * --color-primary-subtle. When a token changes in the Hub it changes here by
+ * hand; the names match so the diff is obvious.
+ *
+ * Tailwind is used for layout only (grid, wrap, breakpoints). Colours, type
+ * and spacing of the components come from these tokens, as in the Hub.
+ */
+
+:root {
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f7f8;
+  --color-neutral-100: #efeff1;
+  --color-neutral-200: #e5e5ea;
+  --color-neutral-300: #d9d9d9;
+  --color-neutral-400: #c1c1c2;
+  --color-neutral-500: #8e8e93;
+  --color-neutral-600: #737373;
+  --color-neutral-700: #525252;
+  --color-neutral-800: #3a3a3c;
+  --color-neutral-900: #292929;
+  --color-neutral-950: #1d1d1b;
+
+  --color-orange-50: #fdf3ee;
+  --color-orange-200: #f7c3a8;
+  --color-orange-500: #e9521e;
+  --color-orange-600: #c2410c;
+
+  --color-green-100: #ddf0e4;
+  --color-green-600: #157f3d;
+  --color-crimson-100: #f7dee1;
+  --color-crimson-600: #a3182b;
+  --color-blue-100: #dee6fa;
+  --color-blue-600: #2a5bd7;
+  --color-sand-100: #fbf3e4;
+  --color-sand-600: #8a6510;
+
+  --color-background: var(--color-neutral-50);
+  --color-surface: var(--color-neutral-0);
+  --color-border: var(--color-neutral-200);
+  --color-border-strong: var(--color-neutral-300);
+  --color-foreground: var(--color-neutral-950);
+  --color-foreground-secondary: var(--color-neutral-700);
+  --color-foreground-muted: var(--color-neutral-600);
+  --color-foreground-disabled: var(--color-neutral-400);
+
+  --color-primary: var(--color-orange-500);
+  --color-primary-hover: var(--color-orange-600);
+  --color-primary-foreground: var(--color-neutral-0);
+  --color-primary-subtle: var(--color-orange-50);
+  --color-danger: var(--color-crimson-600);
+  --color-danger-subtle: var(--color-crimson-100);
+  --color-info: var(--color-blue-600);
+  --color-info-subtle: var(--color-blue-100);
+  --color-warning: var(--color-sand-600);
+  --color-warning-subtle: var(--color-sand-100);
+  --color-success: var(--color-green-600);
+  --color-success-subtle: var(--color-green-100);
+
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --radius-2xl: 12px;
+  --radius-full: 9999px;
+}
+
+/* In the base layer, so Tailwind's utilities can still override them. */
+@layer base {
+  body {
+    background: var(--color-surface);
+    color: var(--color-foreground);
+    font-family: var(--font-inter), system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2 {
+    font-family: var(--font-outfit), system-ui, sans-serif;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  /*
+   * A row that is a link (RowLink in components/ui.tsx). The link is pulled 8px
+   * past the row on each side and padded back, so the text stays on the card's
+   * edge and the hover ground has room around it. Text keeps its colour; only
+   * the chevron says "click".
+   */
+  .row-link,
+  .row-plain {
+    display: flex;
+    column-gap: 10px;
+    margin: 0 -8px;
+    padding: 9px 8px;
+    border-radius: 6px;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .row-link:hover {
+    background: var(--color-neutral-50);
+  }
+
+  .row-link-chevron {
+    display: flex;
+    flex-shrink: 0;
+    margin-left: auto;
+    color: var(--color-foreground-disabled);
+  }
+
+  .row-link:hover .row-link-chevron,
+  .row-link:focus-visible .row-link-chevron {
+    color: var(--color-foreground-secondary);
+  }
+
+  /* A name that is a link inside a chart row (AmountBars): same colour, underlined on hover. */
+  .name-link {
+    color: inherit;
+    text-decoration: none;
+    border-radius: 2px;
+  }
+
+  .name-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* The product mark inside a card header: the Hub's 19px icon at 11px, with a heavier stroke so it survives the size. */
+  .product-glyph > svg {
+    width: 11px;
+    height: 11px;
+  }
+
+  .product-glyph > svg [stroke] {
+    stroke-width: 2.6;
+  }
+}
