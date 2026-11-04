@@ -8,6 +8,7 @@ import { useState, useTransition } from "react";
 import { setLocationAction } from "@/app/actions";
 import { RADIUS_OPTIONS_KM } from "@/lib/config";
 import type { MemberLocation } from "@/lib/events";
+import { geocodeInBrowser } from "@/lib/geocode-core";
 import { BTN_PRIMARY, BTN_SECONDARY, CARD, HELP, INPUT, LABEL } from "./ui";
 
 /** "Where are you?" — asked once, editable from the subtitle's "Change". */
@@ -22,6 +23,12 @@ export function LocationForm({ current }: { current: MemberLocation | null }) {
       action={(fd) =>
         start(async () => {
           setError(null);
+          const hit = (await geocodeInBrowser(String(fd.get("city") ?? ""), "city"))[0];
+          if (hit) {
+            fd.set("lat", String(hit.lat));
+            fd.set("lng", String(hit.lng));
+            fd.set("found_city", hit.city ?? hit.label);
+          }
           const r = await setLocationAction(fd);
           if (!r.ok) setError(t("notFound"));
           else router.push("/");

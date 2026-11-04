@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useState, useTransition } from "react";
 import { geocodeAction, prefillAction, submitEventAction } from "@/app/actions";
+import { geocodeInBrowser } from "@/lib/geocode-core";
 import { EVENT_KINDS, RADIUS_OPTIONS_KM, type EventKind, type Locale } from "@/lib/config";
 import type { MemberLocation } from "@/lib/events";
 import { dayMonth, fromLocalInput, km, toLocalInput, when } from "@/lib/format";
@@ -83,7 +84,10 @@ export function NewEventForm({ locale, isAdmin, memberLocation }: { locale: Loca
   const locate = () =>
     start(async () => {
       setGeo("busy");
-      const r = await geocodeAction([f.address, f.city].filter(Boolean).join(", "));
+      const q = [f.address, f.city].filter(Boolean).join(", ");
+      // From the page first (like the map tiles), the server as a fallback.
+      const inPage = (await geocodeInBrowser(q, "address"))[0];
+      const r = inPage ? { ok: true as const, data: inPage } : await geocodeAction(q);
       if (!r.ok) return setGeo("fail");
       setF((s) => ({ ...s, lat: r.data.lat, lng: r.data.lng, city: s.city || r.data.city || "" }));
       setGeo("ok");

@@ -25,7 +25,11 @@ export async function setLocationAction(formData: FormData): Promise<ActionResul
   const radius = Number(formData.get("radius_km") ?? 25);
   const radiusKm = (RADIUS_OPTIONS_KM as readonly number[]).includes(radius) ? radius : 25;
   if (city.length < 2) return { ok: false, error: "not_found" };
-  const hit = await geocode(city, "city");
+  // The page found the city in the browser (see geocode-core.ts); otherwise the server looks it up.
+  const lat = Number(formData.get("lat")), lng = Number(formData.get("lng"));
+  const found = String(formData.get("found_city") ?? "").trim().slice(0, 120);
+  const fromPage = formData.get("lat") && formData.get("lng") && Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+  const hit = fromPage ? { city: found || city, label: found || city, lat, lng } : await geocode(city, "city");
   if (!hit) return { ok: false, error: "not_found" };
   await locationSet(claims.sub, hit.city ?? hit.label, hit.lat, hit.lng, radiusKm);
   revalidatePath("/");

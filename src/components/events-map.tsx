@@ -104,6 +104,10 @@ export function EventsMap({
       seen.add(p.id);
       let mk = markers.current.get(p.id);
       if (!mk) {
+        // MapLibre positions the outer element (position + transform); the pill
+        // inside is ours to style. Styling the outer one wiped MapLibre's
+        // position and piled every pin in the top-left corner.
+        const wrap = document.createElement("div");
         const b = document.createElement("button");
         b.type = "button";
         b.setAttribute("aria-label", p.title);
@@ -111,13 +115,16 @@ export function EventsMap({
           ev.stopPropagation();
           onSelect?.(p.id);
         });
-        mk = new maplibregl.Marker({ element: b, anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(m);
+        wrap.appendChild(b);
+        mk = new maplibregl.Marker({ element: wrap, anchor: "bottom" }).setLngLat([p.lng, p.lat]).addTo(m);
         markers.current.set(p.id, mk);
       } else mk.setLngLat([p.lng, p.lat]);
-      const b = mk.getElement() as HTMLButtonElement;
+      const wrap = mk.getElement();
+      const b = wrap.firstElementChild as HTMLButtonElement;
       const sel = p.id === selectedId;
       b.textContent = p.label;
-      b.style.cssText = `height:30px;padding:0 10px;border-radius:9999px;border:2px solid #fff;font:600 12px/1 var(--font-inter),system-ui,sans-serif;cursor:${onSelect ? "pointer" : "default"};white-space:nowrap;box-shadow:0 10px 24px -14px rgba(29,29,27,.28);background:${sel ? "#e9521e" : "#1d1d1b"};color:#fff;z-index:${sel ? 3 : 2};position:relative`;
+      b.style.cssText = `display:block;height:30px;padding:0 10px;border-radius:9999px;border:2px solid #fff;font:600 12px/1 var(--font-inter),system-ui,sans-serif;cursor:${onSelect ? "pointer" : "default"};white-space:nowrap;box-shadow:0 10px 24px -14px rgba(29,29,27,.28);background:${sel ? "#e9521e" : "#1d1d1b"};color:#fff`;
+      wrap.style.zIndex = sel ? "3" : "2";
     }
     for (const [id, mk] of markers.current) {
       if (!seen.has(id)) {

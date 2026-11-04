@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { suggestCitiesAction } from "@/app/actions";
 import type { EventKind } from "@/lib/config";
-import type { GeoHit } from "@/lib/geocode";
+import { geocodeInBrowser, type GeoHit } from "@/lib/geocode-core";
 import { INPUT } from "./ui";
 
 /**
@@ -27,7 +27,9 @@ export function CitySearch({ kind, current }: { kind: EventKind | null; current:
     const n = ++seq.current; // any answer still in flight is now stale
     if (query.length < 2 || query === current) return;
     const timer = setTimeout(async () => {
-      const r = await suggestCitiesAction(query);
+      // From the page first (like the map tiles), the server as a fallback.
+      let r = await geocodeInBrowser(query, "city", { autocomplete: true, limit: 5 });
+      if (r.length === 0) r = await suggestCitiesAction(query);
       if (n === seq.current) {
         setHits(r);
         setActive(-1);
@@ -38,6 +40,14 @@ export function CitySearch({ kind, current }: { kind: EventKind | null; current:
 
   // Suggestions only while there is something new to look up.
   const shown = q.trim().length >= 2 && q.trim() !== current ? hits : [];
+
+  const submit = async () => {
+    const picked = active >= 0 ? (shown[active] ?? null) : null;
+    if (picked) return go(picked);
+    // Enter without picking: the first suggestion, or one lookup now; the server tries last (?city= alone).
+    const first = shown[0] ?? (await geocodeInBrowser(q, "city", { limit: 1 }))[0] ?? null;
+    go(first);
+  };
 
   const go = (hit: GeoHit | null) => {
     const params = new URLSearchParams();
@@ -58,7 +68,7 @@ export function CitySearch({ kind, current }: { kind: EventKind | null; current:
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
-        go(active >= 0 ? (shown[active] ?? null) : null);
+        void submit();
       }}
       style={{ position: "relative", width: "100%", maxWidth: 360 }}
     >
