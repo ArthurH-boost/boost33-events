@@ -7,7 +7,8 @@ import { currentSession } from "@/lib/current";
 import { adminReview, eventSubmit, locationSet, rsvpSet, type NewEvent } from "@/lib/events";
 import { prefillFromUrl } from "@/lib/fetch-page";
 import { fromLocalInput } from "@/lib/format";
-import { geocode, type GeoHit } from "@/lib/geocode";
+import { geocode, suggestCities, type GeoHit } from "@/lib/geocode";
+import { isPlatform, platformFromUrl, safeUrl } from "@/lib/online";
 import type { Prefill } from "@/lib/import-link";
 
 /*
@@ -58,6 +59,12 @@ export async function geocodeAction(address: string): Promise<ActionResult<GeoHi
   return hit ? { ok: true, data: hit } : { ok: false, error: "not_found" };
 }
 
+/** Cities matching what is typed in the "search a city" field. Read-only: nothing is saved. */
+export async function suggestCitiesAction(query: string): Promise<GeoHit[]> {
+  await currentSession();
+  return suggestCities(String(query ?? "").slice(0, 80));
+}
+
 /** Submit a new event. Admins' events are published straight away. */
 export async function submitEventAction(formData: FormData): Promise<ActionResult<{ id: string; queued: number | null }>> {
   const { claims, isAdmin } = await currentSession();
@@ -77,6 +84,11 @@ export async function submitEventAction(formData: FormData): Promise<ActionResul
   const priceRaw = str("price");
   const price = priceRaw === "paid" || priceRaw === "invite" ? priceRaw : "free";
   const radius = num("push_radius_km") ?? 25;
+  // Online: the direct link to the live (platform URL only, never rewritten) and its platform.
+  const onlineUrl = is_online ? safeUrl(str("online_url")) : null;
+  if (is_online && !onlineUrl) return { ok: false, error: "link" };
+  const platformRaw = str("online_platform");
+  const online_platform = is_online ? (isPlatform(platformRaw) ? platformRaw : platformFromUrl(onlineUrl) ?? (onlineUrl ? "other" : undefined)) : undefined;
 
   const event: NewEvent = {
     kind: is_online && kind !== "online" ? kind : kind,
@@ -90,6 +102,8 @@ export async function submitEventAction(formData: FormData): Promise<ActionResul
     starts_at,
     ends_at,
     is_online,
+    online_platform: online_platform ?? undefined,
+    online_url: onlineUrl ?? undefined,
     venue_name: is_online ? undefined : str("venue_name") || undefined,
     address: is_online ? undefined : str("address") || undefined,
     city: is_online ? undefined : str("city") || undefined,

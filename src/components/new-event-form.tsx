@@ -9,6 +9,7 @@ import { EVENT_KINDS, RADIUS_OPTIONS_KM, type EventKind, type Locale } from "@/l
 import type { MemberLocation } from "@/lib/events";
 import { dayMonth, fromLocalInput, km, toLocalInput, when } from "@/lib/format";
 import type { Prefill } from "@/lib/import-link";
+import { ONLINE_PLATFORMS, PLATFORM_NAMES, platformFromUrl, type OnlinePlatform } from "@/lib/online";
 import { BTN_PRIMARY, BTN_SECONDARY, CARD, DateSquare, Eyebrow, HELP, INPUT, LABEL, META, ROW_TITLE, Row, Tag } from "./ui";
 
 type Form = {
@@ -19,6 +20,8 @@ type Form = {
   starts_at: string; // datetime-local
   ends_at: string;
   is_online: boolean;
+  online_platform: OnlinePlatform | "";
+  online_url: string;
   venue_name: string;
   address: string;
   city: string;
@@ -32,7 +35,7 @@ type Form = {
   brokers_only: boolean;
 };
 
-const EMPTY: Form = { source_url: "", title: "", kind: "networking", price: "free", starts_at: "", ends_at: "", is_online: false, venue_name: "", address: "", city: "", lat: null, lng: null, description: "", organiser: "", ticket_url: "", image_url: "", push_radius_km: 25, brokers_only: false };
+const EMPTY: Form = { source_url: "", title: "", kind: "networking", price: "free", starts_at: "", ends_at: "", is_online: false, online_platform: "", online_url: "", venue_name: "", address: "", city: "", lat: null, lng: null, description: "", organiser: "", ticket_url: "", image_url: "", push_radius_km: 25, brokers_only: false };
 
 /** The whole form lives in one state object so the two previews in the rail follow every keystroke. */
 export function NewEventForm({ locale, isAdmin, memberLocation }: { locale: Locale; isAdmin: boolean; memberLocation: MemberLocation | null }) {
@@ -68,6 +71,9 @@ export function NewEventForm({ locale, isAdmin, memberLocation }: { locale: Loca
         organiser: p.organiser ?? s.organiser,
         image_url: p.image_url ?? s.image_url,
         ticket_url: p.ticket_url ?? s.ticket_url,
+        // An imported online event: the page's own link is usually where it streams.
+        online_url: p.is_online && !s.online_url ? (p.ticket_url ?? s.source_url) : s.online_url,
+        online_platform: p.is_online && !s.online_platform ? (platformFromUrl(p.ticket_url ?? s.source_url) ?? "") : s.online_platform,
         price: p.price ?? s.price,
       }));
       if (p.lat != null) setGeo("ok");
@@ -88,7 +94,7 @@ export function NewEventForm({ locale, isAdmin, memberLocation }: { locale: Loca
       setNotice(null);
       const r = await submitEventAction(fd);
       if (!r.ok) {
-        const key = r.error === "title" || r.error === "date" || r.error === "place" ? r.error : "generic";
+        const key = r.error === "title" || r.error === "date" || r.error === "place" || r.error === "link" ? r.error : "generic";
         return setNotice({ tone: "error", text: t(`errors.${key}`) });
       }
       setDone(r.data);
@@ -161,6 +167,33 @@ export function NewEventForm({ locale, isAdmin, memberLocation }: { locale: Loca
                 {t("online")}
               </label>
 
+              {f.is_online && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field id="online_url" label={t("onlineUrl")} help={t("onlineUrlHelp")}>
+                    <input
+                      id="online_url"
+                      name="online_url"
+                      type="url"
+                      required
+                      value={f.online_url}
+                      onChange={(e) => {
+                        const url = e.target.value;
+                        const guessed = platformFromUrl(url);
+                        setF((s) => ({ ...s, online_url: url, online_platform: guessed ?? s.online_platform }));
+                      }}
+                      placeholder="https://www.twitch.tv/…"
+                      style={INPUT}
+                    />
+                  </Field>
+                  <Field id="online_platform" label={t("platform")}>
+                    <select id="online_platform" name="online_platform" value={f.online_platform} onChange={(e) => set("online_platform", e.target.value as OnlinePlatform)} style={INPUT}>
+                      <option value="">{t("platformPick")}</option>
+                      {ONLINE_PLATFORMS.map((p) => <option key={p} value={p}>{p === "other" ? t("platformOther") : PLATFORM_NAMES[p]}</option>)}
+                    </select>
+                  </Field>
+                </div>
+              )}
+
               {!f.is_online && (
                 <>
                   <Field id="venue_name" label={t("venue")}>
@@ -226,7 +259,7 @@ export function NewEventForm({ locale, isAdmin, memberLocation }: { locale: Loca
             <DateSquare day={d.day} month={d.month} />
             <span style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
               <span style={ROW_TITLE}>{f.title || "—"}</span>
-              <span style={META}>{startIso ? when(startIso, fromLocalInput(f.ends_at), locale) : "—"}{f.is_online ? ` · ${tk("online")}` : f.venue_name ? ` · ${f.venue_name}` : ""}</span>
+              <span style={META}>{startIso ? when(startIso, fromLocalInput(f.ends_at), locale) : "—"}{f.is_online ? ` · ${f.online_platform && f.online_platform !== "other" ? PLATFORM_NAMES[f.online_platform] : tk("online")}` : f.venue_name ? ` · ${f.venue_name}` : ""}</span>
             </span>
             <Tag>{tk(f.kind)}</Tag>
           </div>

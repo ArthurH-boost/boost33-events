@@ -68,6 +68,8 @@ export function EventsMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
+  const lastCentre = useRef<string | null>(null);
+
   // The person's city and radius.
   useEffect(() => {
     const m = map.current;
@@ -83,6 +85,10 @@ export function EventsMap({
           dot.style.cssText = "width:14px;height:14px;border-radius:50%;background:#2a5bd7;border:3px solid #fff;box-shadow:0 0 0 5px rgba(42,91,215,.2)";
           you.current = new maplibregl.Marker({ element: dot }).setLngLat([center.lng, center.lat]).addTo(m);
         } else you.current.setLngLat([center.lng, center.lat]);
+        // A searched city: move the map there, once per city (not on every render).
+        const key = `${center.lat.toFixed(4)},${center.lng.toFixed(4)}`;
+        if (lastCentre.current !== null && lastCentre.current !== key) m.flyTo({ center: [center.lng, center.lat], zoom: 11, duration: 600 });
+        lastCentre.current = key;
       }
     };
     if (m.isStyleLoaded()) apply();

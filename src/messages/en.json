@@ -48,7 +48,10 @@
     "zoomOut": "Zoom out",
     "you": "You",
     "pending": "Pending review",
-    "mine": "Proposed by you"
+    "mine": "Proposed by you",
+    "searchSubtitle": "Search: {city} · within {radius} km",
+    "backTo": "Back to {city}",
+    "searchNotFound": "Couldn't find “{city}”. Try another spelling."
   },
   "location": {
     "title": "Where are you?",
@@ -87,7 +90,9 @@
     "online": "Online event",
     "joinOnline": "Join online",
     "date": "Date",
-    "to": "to"
+    "to": "to",
+    "joinOn": "Join on {platform}",
+    "joinHint": "The link opens the organiser's platform directly."
   },
   "new": {
     "title": "Propose an event",
@@ -134,10 +139,16 @@
       "title": "Give the event a title (3 characters or more).",
       "date": "Give a start date and time.",
       "place": "Give an address and find it on the map, or tick “online”.",
-      "generic": "Something went wrong. Try again."
+      "generic": "Something went wrong. Try again.",
+      "link": "Add the live link (starting with https://)."
     },
     "done": "Thanks! Your event is pending review.",
-    "doneAdmin": "Published. {queued, plural, =0 {No notification queued} =1 {1 notification queued} other {# notifications queued}}."
+    "doneAdmin": "Published. {queued, plural, =0 {No notification queued} =1 {1 notification queued} other {# notifications queued}}.",
+    "onlineUrl": "Live / video call link",
+    "onlineUrlHelp": "The direct link to TikTok, Whatnot, Zoom, Twitch… Members go straight there.",
+    "platform": "Platform",
+    "platformPick": "Choose…",
+    "platformOther": "Other (webinar, other tool)"
   },
   "admin": {
     "title": "Review queue",
@@ -153,7 +164,8 @@
     "by": "by {name}",
     "source": "Source",
     "queued": "{count, plural, =0 {no notifications} =1 {1 notification} other {# notifications}} queued",
-    "notAdmin": "This page is for Boost33 admins."
+    "notAdmin": "This page is for Boost33 admins.",
+    "liveLink": "Live link"
   },
   "email": {
     "subject": "New event near you: {title}",
@@ -163,5 +175,9 @@
     "network": "{count, plural, =0 {} =1 {1 member of your network is going.} other {# members of your network are going.}}",
     "cta": "See the event",
     "footer": "You receive this because you set a city in Boost33 Events. Change it or your radius at events.boost33.com."
+  },
+  "search": {
+    "label": "Search a city",
+    "placeholder": "Search a city: Nantes, Lyon…"
   }
 }

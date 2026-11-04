@@ -31,3 +31,24 @@ export async function geocode(query: string, kind: "address" | "city" = "address
   const city = f.place_type?.some((t) => t === "municipality" || t === "place") ? (f.text ?? null) : (municipality ?? null);
   return { label: f.place_name ?? q, city, lat, lng };
 }
+
+/**
+ * Up to five cities matching what the person is typing, for the "search a
+ * city" field. Same API and key, with MapTiler's autocomplete; cities only.
+ */
+export async function suggestCities(query: string): Promise<GeoHit[]> {
+  const key = setting("MAPTILER_KEY");
+  const q = query.trim();
+  if (!key || q.length < 2) return [];
+  const url = `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json?key=${encodeURIComponent(key)}&autocomplete=true&limit=5&language=fr&country=fr,be,ch,lu&types=municipality,locality,place`;
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return [];
+    const json = (await res.json()) as { features?: Array<{ place_name?: string; center?: [number, number]; text?: string }> };
+    return (json.features ?? [])
+      .filter((f) => f.center)
+      .map((f) => ({ label: f.place_name ?? f.text ?? q, city: f.text ?? null, lat: f.center![1], lng: f.center![0] }));
+  } catch {
+    return [];
+  }
+}

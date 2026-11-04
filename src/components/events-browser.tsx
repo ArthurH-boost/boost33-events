@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
 import type { EventKind, Locale } from "@/lib/config";
-import type { EventRow, Near } from "@/lib/events";
+import type { EventRow, MemberLocation, Near } from "@/lib/events";
 import { dayMonth, km, when } from "@/lib/format";
+import { PLATFORM_NAMES } from "@/lib/online";
 import { EventsMap, type Pin } from "./events-map";
 import { BigNumber, BTN_PRIMARY, CARD, Chevron, DateSquare, EYEBROW, KIND_ORDER, MAIN_CARD, META, NetworkDots, ROW_TITLE, Row, Tag } from "./ui";
 
@@ -16,7 +17,8 @@ import { BigNumber, BTN_PRIMARY, CARD, Chevron, DateSquare, EYEBROW, KIND_ORDER,
  * rail with the map and the selected event. Selecting a row or a pin
  * highlights both; opening goes to the fiche.
  */
-export function EventsBrowser({ near, kind, locale }: { near: Near; kind: EventKind | null; locale: Locale }) {
+/** `centre`: the searched city, or the saved one. `query`: the search, kept when a filter is clicked. */
+export function EventsBrowser({ near, centre, query, kind, locale }: { near: Near; centre: MemberLocation | null; query: string; kind: EventKind | null; locale: Locale }) {
   const t = useTranslations("home");
   const tk = useTranslations("kinds");
   const router = useRouter();
@@ -30,6 +32,8 @@ export function EventsBrowser({ near, kind, locale }: { near: Near; kind: EventK
   const current = near.events.find((e) => e.id === selected) ?? near.events[0] ?? null;
   const networkTotal = near.events.reduce((n, e) => n + e.network_going, 0);
   const top = near.events.reduce<EventRow | null>((best, e) => (e.network_going > (best?.network_going ?? 0) ? e : best), null);
+
+  const onlineLabel = (e: EventRow) => (e.online_platform && e.online_platform !== "other" ? PLATFORM_NAMES[e.online_platform] : t("online"));
 
   const filters: Array<{ key: EventKind | null; label: string }> = [{ key: null, label: tk("all") }, ...KIND_ORDER.map((k) => ({ key: k, label: tk(k) }))];
 
@@ -48,7 +52,7 @@ export function EventsBrowser({ near, kind, locale }: { near: Near; kind: EventK
               return (
                 <Link
                   key={f.key ?? "all"}
-                  href={f.key ? `/?kind=${f.key}` : "/"}
+                  href={filterHref(f.key, query)}
                   aria-current={active ? "true" : undefined}
                   style={{ display: "inline-flex", alignItems: "center", height: 32, padding: "0 12px", borderRadius: 9999, fontSize: 13, fontWeight: 600, textDecoration: "none", border: `1px solid ${active ? "var(--color-neutral-950)" : "var(--color-border-strong)"}`, background: active ? "var(--color-neutral-950)" : "var(--color-surface)", color: active ? "#FFFFFF" : "var(--color-foreground)" }}
                 >
@@ -93,7 +97,7 @@ export function EventsBrowser({ near, kind, locale }: { near: Near; kind: EventK
                       <span style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
                         <span style={ROW_TITLE}>{e.title}</span>
                         <span style={META}>
-                          {when(e.starts_at, e.ends_at, locale)} · {e.is_online ? t("online") : [e.venue_name ?? e.city, km(e.distance_km, locale)].filter(Boolean).join(" · ")}
+                          {when(e.starts_at, e.ends_at, locale)} · {e.is_online ? onlineLabel(e) : [e.venue_name ?? e.city, km(e.distance_km, locale)].filter(Boolean).join(" · ")}
                         </span>
                       </span>
                       {e.network_going > 0 && (
@@ -126,11 +130,11 @@ export function EventsBrowser({ near, kind, locale }: { near: Near; kind: EventK
       rail={
         <>
           <div style={EYEBROW}>{t("map")}</div>
-          <EventsMap center={near.location ? { lat: near.location.lat, lng: near.location.lng } : null} radiusKm={near.location?.radius_km ?? null} pins={pins} selectedId={current?.id ?? null} onSelect={onSelect} height={400} youLabel={t("you")} />
+          <EventsMap center={centre ? { lat: centre.lat, lng: centre.lng } : null} radiusKm={centre?.radius_km ?? null} pins={pins} selectedId={current?.id ?? null} onSelect={onSelect} height={400} youLabel={t("you")} />
           {current && (
             <div style={{ ...CARD, padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
               <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "var(--color-foreground-muted)" }}>
-                {t("selected")}{current.distance_km != null ? ` · ${km(current.distance_km, locale)}` : current.is_online ? ` · ${t("online")}` : ""}
+                {t("selected")}{current.distance_km != null ? ` · ${km(current.distance_km, locale)}` : current.is_online ? ` · ${onlineLabel(current)}` : ""}
               </span>
               <span style={ROW_TITLE}>{current.title}</span>
               <span style={META}>{when(current.starts_at, current.ends_at, locale)}{current.venue_name ? ` · ${current.venue_name}` : ""}</span>
@@ -142,4 +146,9 @@ export function EventsBrowser({ near, kind, locale }: { near: Near; kind: EventK
       }
     />
   );
+}
+
+function filterHref(kind: EventKind | null, query: string): string {
+  const parts = [kind ? `kind=${kind}` : "", query].filter(Boolean);
+  return parts.length ? `/?${parts.join("&")}` : "/";
 }

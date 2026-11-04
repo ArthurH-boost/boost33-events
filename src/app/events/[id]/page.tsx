@@ -4,12 +4,13 @@ import { getTranslations } from "next-intl/server";
 import { Header } from "@/components/header";
 import { EventsMap } from "@/components/events-map";
 import { RsvpButton } from "@/components/rsvp-button";
-import { BTN_SECONDARY, BTN_SMALL, CARD, Eyebrow, Footer, MAIN_CARD, META, ROW_TITLE, Row, Tag, Well } from "@/components/ui";
+import { BTN_PRIMARY, BTN_SECONDARY, BTN_SMALL, CARD, Eyebrow, Footer, MAIN_CARD, META, ROW_TITLE, Row, Tag, Well } from "@/components/ui";
 import { APP_URL } from "@/lib/config";
 import { currentSession } from "@/lib/current";
 import { eventGet } from "@/lib/events";
 import { calendarLink, km, longDate, time } from "@/lib/format";
 import { initials } from "@/lib/initials";
+import { PLATFORM_NAMES } from "@/lib/online";
 
 export default async function EventPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -33,7 +34,11 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
     );
   }
 
-  const place = e.is_online ? t("online") : [e.venue_name, e.city].filter(Boolean).join(", ");
+  // Online: the platform's own name ("Twitch"), and its link as is — straight to the platform, nothing through Boost33.
+  const platform = e.online_platform && e.online_platform !== "other" ? PLATFORM_NAMES[e.online_platform] : null;
+  const joinUrl = e.is_online ? (e.online_url ?? e.ticket_url) : null;
+  const joinLabel = platform ? t("joinOn", { platform }) : t("joinOnline");
+  const place = e.is_online ? (platform ?? t("online")) : [e.venue_name, e.city].filter(Boolean).join(", ");
   const dist = km(e.distance_km, locale);
   const pageUrl = `${APP_URL}/events/${e.id}`;
   const directions = e.address ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(e.address)}` : null;
@@ -56,6 +61,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
               <Tag>{tk(e.kind)}</Tag>
               <Tag>{tp(e.price)}</Tag>
               {dist && <Tag>{dist}</Tag>}
+              {e.is_online && <Tag tone="primary">{platform ?? t("online")}</Tag>}
               {e.brokers_only && <Tag tone="primary">Brokers</Tag>}
             </div>
             <h1 style={{ fontFamily: "var(--font-outfit)", fontSize: 36, fontWeight: 600, letterSpacing: "-0.025em", lineHeight: "40px" }}>{e.title}</h1>
@@ -64,6 +70,7 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
             </p>
           </div>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {joinUrl && <a href={joinUrl} target="_blank" rel="noopener noreferrer" style={BTN_PRIMARY}>{joinLabel} ↗</a>}
             <a href={calendarLink(e, pageUrl)} target="_blank" rel="noreferrer" style={BTN_SECONDARY}>{t("addToCalendar")}</a>
             {e.status === "published" && <RsvpButton eventId={e.id} initialGoing={e.me_going} initialCount={e.going} />}
           </div>
@@ -117,10 +124,11 @@ export default async function EventPage({ params }: { params: Promise<{ id: stri
                   </div>
                 )}
                 <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 4 }}>
-                  <span style={ROW_TITLE}>{e.is_online ? t("online") : e.venue_name ?? e.city ?? "—"}</span>
+                  <span style={ROW_TITLE}>{e.is_online ? (platform ?? t("online")) : e.venue_name ?? e.city ?? "—"}</span>
                   {e.address && <span style={META}>{e.address}</span>}
                   {directions && <a href={directions} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, paddingTop: 6 }}>{t("directions")}</a>}
-                  {e.is_online && e.ticket_url && <a href={e.ticket_url} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 600, paddingTop: 6 }}>{t("joinOnline")}</a>}
+                  {joinUrl && <a href={joinUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 600, paddingTop: 6 }}>{joinLabel} ↗</a>}
+                  {e.is_online && <span style={{ ...META, paddingTop: 4 }}>{t("joinHint")}</span>}
                 </div>
               </div>
 

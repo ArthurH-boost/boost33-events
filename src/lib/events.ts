@@ -1,6 +1,7 @@
 import "server-only";
 import { brokersConfigured, callValue } from "./db";
 import type { EventKind } from "./config";
+import type { OnlinePlatform } from "./online";
 import { FIXTURE_NEAR, fixtureEvent } from "./fixtures";
 
 /** One event as the list shows it (`events_row_json`). */
@@ -15,6 +16,8 @@ export type EventRow = {
   starts_at: string;
   ends_at: string | null;
   is_online: boolean;
+  online_platform: OnlinePlatform | null;
+  online_url: string | null;
   venue_name: string | null;
   city: string | null;
   lat: number | null;
@@ -63,15 +66,27 @@ export type AdminRow = EventRow & {
 export type HubWidget = {
   location: MemberLocation | null;
   new_this_week: number;
+  /** Online events (lives, webinars) in the next 7 days, for the line under the Hub's mini-map. */
+  online_this_week: number;
   events: EventRow[];
 };
 
 /** Without a database (local dev with no env), the app runs on fixtures so the screens can be worked on. */
 const live = () => brokersConfigured();
 
-export async function eventsNear(person: string, kind: EventKind | null): Promise<Near> {
-  if (!live()) return FIXTURE_NEAR(kind);
-  return callValue<Near>("events_near", { p_person: person, p_kind: kind });
+/** A city the person searched for: the list and the map centre on it; the saved city does not change. */
+/** radius_km null: the person's own radius (or 25 km). */
+export type SearchCentre = { city: string; lat: number; lng: number; radius_km: number | null };
+
+export async function eventsNear(person: string, kind: EventKind | null, search: SearchCentre | null = null): Promise<Near> {
+  if (!live()) return FIXTURE_NEAR(kind, search);
+  return callValue<Near>("events_near", {
+    p_person: person,
+    p_kind: kind,
+    p_lat: search?.lat ?? null,
+    p_lng: search?.lng ?? null,
+    p_radius_km: search?.radius_km ?? null,
+  });
 }
 
 export async function eventGet(id: string, person: string, admin: boolean): Promise<EventDetail | null> {
@@ -101,6 +116,8 @@ export type NewEvent = {
   starts_at: string;
   ends_at?: string;
   is_online: boolean;
+  online_platform?: OnlinePlatform;
+  online_url?: string;
   venue_name?: string;
   address?: string;
   city?: string;
@@ -133,7 +150,13 @@ export async function adminReview(event: string, actor: string, decision: "publi
 export async function hubWidget(person: string): Promise<HubWidget> {
   if (!live()) {
     const n = FIXTURE_NEAR(null);
-    return { location: n.location, new_this_week: n.new_this_week, events: n.events.filter((e) => !e.is_online).slice(0, 6) };
+    const weekAhead = Date.now() + 7 * 86_400_000;
+    return {
+      location: n.location,
+      new_this_week: n.new_this_week,
+      online_this_week: n.events.filter((e) => e.is_online && new Date(e.starts_at).getTime() < weekAhead).length,
+      events: n.events.filter((e) => !e.is_online).slice(0, 6),
+    };
   }
   return callValue<HubWidget>("events_hub_widget", { p_person: person });
 }

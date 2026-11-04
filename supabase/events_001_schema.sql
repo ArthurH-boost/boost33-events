@@ -23,6 +23,10 @@ create table if not exists public.events (
   starts_at       timestamptz not null,
   ends_at         timestamptz,
   is_online       boolean not null default false,
+  -- Online events (4 Nov 2026): where it streams, and the direct link to it.
+  -- The link goes straight to the platform; nothing passes through Boost33.
+  online_platform text check (online_platform in ('tiktok', 'whatnot', 'zoom', 'teams', 'meet', 'twitch', 'youtube', 'linkedin', 'other')),
+  online_url      text check (online_url is null or online_url ~* '^https?://'),
   venue_name      text,
   address         text,
   city            text,
@@ -40,6 +44,9 @@ create table if not exists public.events (
   updated_at      timestamptz not null default now(),
   constraint events_place check (is_online or (lat is not null and lng is not null))
 );
+-- Re-run safety: a database created before the online fields gets them here.
+alter table public.events add column if not exists online_platform text check (online_platform in ('tiktok', 'whatnot', 'zoom', 'teams', 'meet', 'twitch', 'youtube', 'linkedin', 'other'));
+alter table public.events add column if not exists online_url text check (online_url is null or online_url ~* '^https?://');
 create index if not exists events_status_starts_idx on public.events (status, starts_at);
 create index if not exists events_submitted_by_idx on public.events (submitted_by);
 
@@ -121,6 +128,8 @@ as $$
     'starts_at', e.starts_at,
     'ends_at', e.ends_at,
     'is_online', e.is_online,
+    'online_platform', e.online_platform,
+    'online_url', e.online_url,
     'venue_name', e.venue_name,
     'city', e.city,
     'lat', e.lat,
@@ -164,10 +173,15 @@ $$;
 
 -- ── Reading events ──────────────────────────────────────────────────────────
 
--- Published upcoming events around the person (within their radius), plus online
--- ones. No location yet: online events only, and `location` is null so the app
--- asks for a city.
-create or replace function public.events_near(p_person uuid, p_kind text default null)
+-- Published upcoming events around a centre (within a radius), plus online ones
+-- (online events are shown to everybody, whatever the city). The centre is the
+-- person's saved city, or a city they searched for (p_lat / p_lng / p_radius_km,
+-- 4 Nov 2026) — a search never changes the saved city. No centre at all: online
+-- events only, and `location` is null so the app asks for a city.
+drop function if exists public.events_near(uuid, text);
+create or replace function public.events_near(p_person uuid, p_kind text default null,
+                                              p_lat double precision default null, p_lng double precision default null,
+                                              p_radius_km integer default null)
 returns jsonb
 language plpgsql
 stable
@@ -177,27 +191,35 @@ as $$
 declare
   l public.events_member_locations;
   v_broker boolean;
+  v_lat double precision;
+  v_lng double precision;
+  v_radius integer;
 begin
   select * into l from public.events_member_locations where person_id = p_person;
   v_broker := exists (select 1 from public.trade_members m where m.b33_person_id = p_person and m.role in ('broker', 'sales'));
+  if p_lat is not null and p_lng is not null then
+    v_lat := p_lat; v_lng := p_lng; v_radius := coalesce(p_radius_km, l.radius_km, 25);
+  else
+    v_lat := l.lat; v_lng := l.lng; v_radius := l.radius_km;
+  end if;
 
   return jsonb_build_object(
     'location', case when l.person_id is null then null else to_jsonb(l) - 'person_id' end,
     'events', coalesce((
-      select jsonb_agg(public.events_row_json(e, p_person, l.lat, l.lng) order by e.starts_at)
+      select jsonb_agg(public.events_row_json(e, p_person, v_lat, v_lng) order by e.starts_at)
         from public.events e
        where e.status = 'published'
          and coalesce(e.ends_at, e.starts_at + interval '3 hours') >= now()
          and (p_kind is null or e.kind = p_kind)
          and (not e.brokers_only or v_broker)
          and (e.is_online
-              or (l.person_id is not null and public.events_distance_km(l.lat, l.lng, e.lat, e.lng) <= l.radius_km))
+              or (v_lat is not null and public.events_distance_km(v_lat, v_lng, e.lat, e.lng) <= v_radius))
     ), '[]'::jsonb),
     'new_this_week', (
       select count(*) from public.events e
        where e.status = 'published' and e.published_at >= now() - interval '7 days'
          and coalesce(e.ends_at, e.starts_at + interval '3 hours') >= now()
-         and (e.is_online or (l.person_id is not null and public.events_distance_km(l.lat, l.lng, e.lat, e.lng) <= l.radius_km))),
+         and (e.is_online or (v_lat is not null and public.events_distance_km(v_lat, v_lng, e.lat, e.lng) <= v_radius))),
     'mine', coalesce((
       select jsonb_agg(jsonb_build_object('id', e.id, 'title', e.title, 'status', e.status, 'starts_at', e.starts_at) order by e.created_at desc)
         from public.events e where e.submitted_by = p_person and e.status <> 'cancelled'), '[]'::jsonb)
@@ -257,7 +279,7 @@ declare
   v_id uuid;
 begin
   insert into public.events (kind, title, description, source_url, ticket_url, image_url, organiser, price,
-                             starts_at, ends_at, is_online, venue_name, address, city, lat, lng,
+                             starts_at, ends_at, is_online, online_platform, online_url, venue_name, address, city, lat, lng,
                              push_radius_km, brokers_only, submitted_by, submitted_name, submitted_email)
   values (coalesce(p_event->>'kind', 'networking'),
           p_event->>'title',
@@ -270,6 +292,8 @@ begin
           (p_event->>'starts_at')::timestamptz,
           nullif(p_event->>'ends_at', '')::timestamptz,
           coalesce((p_event->>'is_online')::boolean, false),
+          nullif(p_event->>'online_platform', ''),
+          nullif(p_event->>'online_url', ''),
           nullif(p_event->>'venue_name', ''),
           nullif(p_event->>'address', ''),
           nullif(p_event->>'city', ''),
@@ -382,6 +406,8 @@ begin
     lat         = coalesce((p_patch->>'lat')::double precision, lat),
     lng         = coalesce((p_patch->>'lng')::double precision, lng),
     ticket_url  = coalesce(p_patch->>'ticket_url', ticket_url),
+    online_platform = coalesce(p_patch->>'online_platform', online_platform),
+    online_url  = coalesce(p_patch->>'online_url', online_url),
     image_url   = coalesce(p_patch->>'image_url', image_url),
     reviewed_by = p_actor,
     updated_at  = now()
@@ -410,6 +436,13 @@ begin
        where e.status = 'published' and e.published_at >= now() - interval '7 days'
          and coalesce(e.ends_at, e.starts_at + interval '3 hours') >= now()
          and (e.is_online or (l.person_id is not null and public.events_distance_km(l.lat, l.lng, e.lat, e.lng) <= l.radius_km))),
+    -- Online events (lives, webinars) in the next 7 days, for everybody: the
+    -- line under the mini-map ("2 online events this week").
+    'online_this_week', (
+      select count(*) from public.events e
+       where e.status = 'published' and e.is_online and not e.brokers_only
+         and coalesce(e.ends_at, e.starts_at + interval '3 hours') >= now()
+         and e.starts_at < now() + interval '7 days'),
     'events', coalesce((
       select jsonb_agg(x order by (x->>'starts_at')) from (
         select public.events_row_json(e, p_person, l.lat, l.lng) as x

@@ -6,6 +6,7 @@ import type { QueuedNotification } from "./events";
 import { km, when } from "./format";
 import en from "@/messages/en.json";
 import fr from "@/messages/fr.json";
+import { PLATFORM_NAMES } from "./online";
 
 /**
  * The "new event near you" email. One provider call per notification; the
@@ -23,7 +24,8 @@ export async function sendEventEmail(n: QueuedNotification): Promise<{ ok: true;
   const locale = n.locale === "fr" ? "fr" : "en";
   const m = (locale === "fr" ? fr : en).email;
   const e = n.event;
-  const place = e.is_online ? (locale === "fr" ? "en ligne" : "online") : [e.venue_name, e.city].filter(Boolean).join(", ");
+  const platform = e.online_platform && e.online_platform !== "other" ? PLATFORM_NAMES[e.online_platform] : null;
+  const place = e.is_online ? (platform ? (locale === "fr" ? `en ligne sur ${platform}` : `online on ${platform}`) : locale === "fr" ? "en ligne" : "online") : [e.venue_name, e.city].filter(Boolean).join(", ");
   const distance = e.distance_km != null ? km(e.distance_km, locale)!.replace(" km", "") : null;
   const whenText = when(e.starts_at, e.ends_at, locale);
   const url = `${APP_URL}/events/${e.id}`;

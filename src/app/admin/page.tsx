@@ -6,6 +6,7 @@ import { BTN_PRIMARY, BTN_SECONDARY, BTN_SMALL, DateSquare, Footer, INPUT, MAIN_
 import { currentSession } from "@/lib/current";
 import { adminList } from "@/lib/events";
 import { dayMonth, when } from "@/lib/format";
+import { PLATFORM_NAMES } from "@/lib/online";
 
 type Status = "pending" | "published" | "rejected";
 
@@ -63,9 +64,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <span style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 3 }}>
                       <Link href={`/events/${e.id}`} style={{ ...ROW_TITLE, textDecoration: "none" }}>{e.title}</Link>
                       <span style={META}>
-                        {when(e.starts_at, e.ends_at, locale)} · {e.is_online ? tk("online") : [e.venue_name, e.address].filter(Boolean).join(", ")}
+                        {when(e.starts_at, e.ends_at, locale)} · {e.is_online ? (e.online_platform && e.online_platform !== "other" ? PLATFORM_NAMES[e.online_platform] : tk("online")) : [e.venue_name, e.address].filter(Boolean).join(", ")}
                         {e.submitted_name ? ` · ${t("by", { name: e.submitted_name })}` : ""}{e.submitted_email ? ` (${e.submitted_email})` : ""}
                       </span>
+                      {e.online_url && <a href={e.online_url} target="_blank" rel="noopener noreferrer" style={{ ...META, textDecoration: "underline" }}>{t("liveLink")}: {e.online_url}</a>}
                       {e.source_url && <a href={e.source_url} target="_blank" rel="noreferrer" style={{ ...META, textDecoration: "underline" }}>{t("source")}: {e.source_url}</a>}
                     </span>
                     <Tag>{tk(e.kind)}</Tag>
